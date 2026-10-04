@@ -1,4 +1,4 @@
-local plugin = require("type-hider")
+local plugin = require("type-hider.module")
 
 describe("setup", function()
   it("works with default", function()
