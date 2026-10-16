@@ -36,7 +36,7 @@ flowchart TD
     plugin["plugin/type-hider.lua<br/>commands"]
     init["lua/type-hider/init.lua<br/>config + public API"]
     main["lua/type-hider/main.lua<br/>engine"]
-    query["queries/&lt;lang&gt;/type-hider.scm<br/>which syntax is type-only"]
+    query["queries/lang/type-hider.scm<br/>which syntax is type-only"]
     parser["Treesitter parser<br/>(syntax tree of the buffer)"]
     marks["conceal extmarks<br/>(what Neovim draws)"]
 
@@ -75,8 +75,8 @@ flowchart TD
     spec["type.specifier<br/>type-only import/export item"]
     mod["type.modifier<br/>public, readonly, ?, !, ..."]
     clause["type.clause<br/>implements"]
-    plain["type<br/>: T, &lt;T&gt;, ..."]
-    setmark["nvim_buf_set_extmark<br/>conceal = &quot;&quot; / conceal_lines = &quot;&quot;"]
+    plain["type<br/>: T, generics, ..."]
+    setmark["nvim_buf_set_extmark<br/>conceal / conceal_lines"]
     win["apply_window_options<br/>conceallevel = 2, concealcursor = nvic"]
 
     event --> resolve --> supported
