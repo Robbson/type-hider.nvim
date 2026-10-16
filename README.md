@@ -15,8 +15,9 @@ Types are hidden with Neovim's conceal feature. The hidden text is not removed
 from the buffer, so everything keeps working: LSP, diagnostics, navigation and
 so on. Inline types are concealed with an empty placeholder; a type declaration
 that occupies whole lines (an `interface` or a `type` block) has those lines
-folded away instead of being left empty. Because the placeholder is empty, you
-have to run a command to show the types again.
+folded away instead of being left empty, together with one trailing blank line if
+present so folded blocks do not pile up empty separator lines. Because the
+placeholder is empty, you have to run a command to show the types again.
 
 For `.ts` and `.tsx` files the types are hidden automatically once the buffer is
 loaded. These commands switch the hiding on and off:

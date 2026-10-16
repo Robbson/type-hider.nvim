@@ -182,6 +182,27 @@ describe("type-hider", function()
       end
     end)
 
+    it("swallows one blank line after a folded declaration", function()
+      if not has_parser("typescript") then
+        pending("typescript parser is not installed")
+        return
+      end
+
+      local function folded_end(lines)
+        local buf = new_buffer(lines, "typescript")
+        local last
+        for _, m in ipairs(extmarks(buf)) do
+          if m[4].conceal_lines ~= nil then
+            last = m[4].end_row
+          end
+        end
+        return last
+      end
+
+      assert.are.equal(2, folded_end({ "interface P {", "}", "", "let x = 1;" }))
+      assert.are.equal(1, folded_end({ "interface P {", "}", "let x = 1;" }))
+    end)
+
     it("conceals types in tsx as well", function()
       if not has_parser("tsx") then
         pending("tsx parser is not installed")

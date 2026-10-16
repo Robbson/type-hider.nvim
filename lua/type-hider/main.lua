@@ -142,7 +142,14 @@ local function collect_marks(bufnr)
 
       if capture == "type.block" then
         if erow > srow or covers_whole_line(bufnr, srow, scol, erow, ecol) then
-          marks[#marks + 1] = { srow, 0, erow, 0, "lines" }
+          -- Also swallow one blank line right after the declaration so folded
+          -- blocks do not pile up empty separator lines.
+          local last = erow
+          local next_line = vim.api.nvim_buf_get_lines(bufnr, erow + 1, erow + 2, false)[1]
+          if next_line ~= nil and next_line:find("%S") == nil then
+            last = erow + 1
+          end
+          marks[#marks + 1] = { srow, 0, last, 0, "lines" }
         else
           marks[#marks + 1] = { srow, scol, erow, ecol, "inline" }
         end
