@@ -45,7 +45,9 @@ require("type-hider").setup({
 
 The rules live in a dedicated `type-hider` Treesitter query
 (`queries/typescript/type-hider.scm`), not in the `highlights` query, so the
-type hider never interferes with syntax highlighting.
+type hider never interferes with syntax highlighting. See
+[doc/architecture.md](doc/architecture.md) for how the pieces fit together,
+with diagrams of the flow.
 
 ## What gets hidden
 
@@ -87,6 +89,7 @@ extended or trimmed to taste.
 ## Features and structure
 
 - 100% Lua
+- an [architecture document](doc/architecture.md) with diagrams of the flow
 - Github actions for:
   - running tests using [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) and [busted](https://olivinelabs.com/busted/)
   - check for formatting errors (Stylua)
