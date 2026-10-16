@@ -1,37 +1,62 @@
--- Public API and Configuration
-local module = require("type-hider.main")
+-- Public API and configuration.
+local impl = require("type-hider.main")
 
----@class Config
----@field opt string Your config option
----@field formats table Activated language extensions
+---@class typehider.Config
+---@field formats string[] Filetypes whose types are hidden.
+---@field conceallevel integer 'conceallevel' used while the types are hidden.
+---@field concealcursor string 'concealcursor' used while the types are hidden.
+---@field auto_enable boolean Hide types automatically for matching filetypes.
+
+---@type typehider.Config
 local config = {
-  opt = "Hello!",
-  formats = { "ts", "tsx" },
+  formats = { "typescript", "typescriptreact" },
+  conceallevel = 2,
+  concealcursor = "nvic",
+  auto_enable = true,
 }
 
----@class MyModule
+---@class typehider.Module
 local M = {}
 
----@type Config
+---@type typehider.Config
 M.config = config
 
----@param args Config?
--- you can define your setup function here. Usually configurations can be merged, accepting outside params and
--- you can also put some validation here for those.
+---@param args typehider.Config?
 M.setup = function(args)
   M.config = vim.tbl_deep_extend("force", M.config, args or {})
+  impl.setup(M.config)
 end
 
-M.namespace = vim.api.nvim_create_namespace("typehider")
-M.augroup = vim.api.nvim_create_augroup("typehider", {})
-
-M.on_buf_enter = function(args)
-  -- eigentliche Implementierung
-  vim.notify("type-hider: Buffer entered", vim.log.levels.INFO)
+-- A `.tsx` file gets the `typescriptreact` filetype, which normally maps to the
+-- `tsx` Treesitter parser. Register the mapping when no parser provider (such as
+-- nvim-treesitter) has done it already.
+if vim.treesitter.language.get_lang("typescriptreact") == "typescriptreact" then
+  vim.treesitter.language.register("tsx", { "typescriptreact", "typescript.tsx" })
 end
 
+-- Apply the configuration (and auto-enable) even when `setup()` is never called.
+impl.setup(M.config)
+
+---Hide the types in every matching buffer.
+---@return boolean ok
 M.enable = function()
-  return module.enable(M.config.opt)
+  return impl.enable()
+end
+
+---Show the types again.
+---@return boolean ok
+M.disable = function()
+  return impl.disable()
+end
+
+---@return boolean enabled
+M.toggle = function()
+  return impl.toggle()
+end
+
+---@return boolean enabled
+M.is_enabled = function()
+  return impl.is_enabled()
 end
 
 return M

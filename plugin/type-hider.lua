@@ -1,16 +1,14 @@
--- Registration of Neovim Commands
-local plugin = require("type-hider")
+-- Registration of Neovim commands.
+local type_hider = require("type-hider")
 
-vim.api.nvim_create_user_command("TypeHiderEnable", plugin.enable, {})
+vim.api.nvim_create_user_command("TypeHiderEnable", function()
+  type_hider.enable()
+end, { desc = "Hide TypeScript type declarations", force = true })
 
-vim.api.nvim_clear_autocmds({ group = plugin.augroup })
+vim.api.nvim_create_user_command("TypeHiderDisable", function()
+  type_hider.disable()
+end, { desc = "Show TypeScript type declarations", force = true })
 
-vim.api.nvim_create_autocmd({ "BufEnter" }, {
-  group = plugin.augroup,
-  pattern = "*.ts",
-  callback = function(args)
-    plugin.on_buf_enter(args)
-  end,
-})
-
-vim.notify("type-hider loaded successfully!", vim.log.levels.INFO)
+vim.api.nvim_create_user_command("TypeHiderToggle", function()
+  type_hider.toggle()
+end, { desc = "Toggle hiding of TypeScript type declarations", force = true })
