@@ -2,11 +2,15 @@
 
 ![Lua](https://img.shields.io/badge/Made%20with%20Lua-blueviolet.svg?style=for-the-badge&logo=lua)
 
+![type-hider hiding the type declarations of a TypeScript file, switching a type-heavy class to plain JavaScript](assets/demo.gif)
+
 _type-hider_ is a Neovim plugin that hides all type declarations in a TypeScript source file (.ts/.tsx) so the resulting code looks like plain JavaScript without losing any type-safety benefits. Because as the name suggests, types are only hidden from the user, not removed, so they are still working as expected.
 
 This way code can be a lot easier to read, especially in libraries and frameworks where exhaustive type declarations are mandatory.
 
 Unlike transpilers and type stripping algorithms, this is not about the best possible processing & optimizations to transform the code to a specific target platform. The resulting code should look close to the original one, no empty lines removed, no comments removed no optimizations. Because types are just hidden, you can easily switch them on again, as required.
+
+
 
 ## Using it
 
@@ -106,6 +110,7 @@ extended or trimmed to taste.
 
 - 100% Lua
 - an [architecture document](doc/architecture.md) with diagrams of the flow
+- a demo screencast (`assets/demo.gif`, regenerate with `scripts/record-demo.sh`)
 - Github actions for:
   - running tests using [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) and [busted](https://olivinelabs.com/busted/)
   - check for formatting errors (Stylua)
