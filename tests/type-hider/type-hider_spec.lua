@@ -314,4 +314,38 @@ describe("type-hider", function()
       assert.is_true(found, vim.inspect(texts))
     end)
   end)
+
+  describe("navigation", function()
+    it("registers the cursor hook while enabled", function()
+      plugin.enable()
+      assert.is_true(#vim.api.nvim_get_autocmds({ group = "type-hider-refresh", event = "CursorMoved" }) >= 1)
+
+      plugin.disable()
+      assert.are.equal(0, #vim.api.nvim_get_autocmds({ group = "type-hider-refresh", event = "CursorMoved" }))
+    end)
+
+    it("moves the cursor off hidden lines", function()
+      if not has_parser("typescript") then
+        pending("typescript parser is not installed")
+        return
+      end
+
+      local buf = new_buffer(
+        { "let a = 1;", "interface P {", "  x: number;", "}", "let b = 2;" },
+        "typescript"
+      )
+
+      -- Land on the first hidden line while moving down; the hook should push
+      -- the cursor to the first visible line below the block.
+      vim.api.nvim_win_set_cursor(0, { 2, 0 })
+      vim.api.nvim_exec_autocmds("CursorMoved", { buffer = buf })
+      assert.are.equal(5, vim.api.nvim_win_get_cursor(0)[1])
+
+      -- Land on the last hidden line while moving up; the hook should push the
+      -- cursor to the first visible line above the block.
+      vim.api.nvim_win_set_cursor(0, { 4, 0 })
+      vim.api.nvim_exec_autocmds("CursorMoved", { buffer = buf })
+      assert.are.equal(1, vim.api.nvim_win_get_cursor(0)[1])
+    end)
+  end)
 end)

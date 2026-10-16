@@ -55,6 +55,14 @@ local state = {
   enabled = false,
   ---@type table<integer, boolean>
   buffers = {},
+  -- bufnr -> list of hidden line ranges `{ srow, erow }` (0-based, inclusive).
+  -- Used to move the cursor off hidden lines so j/k skip folded declarations.
+  ---@type table<integer, table[]>
+  hidden = {},
+  -- bufnr -> last cursor row (0-based) that was not hidden. Gives the direction
+  -- of travel when the cursor lands on a hidden line.
+  ---@type table<integer, integer>
+  last_row = {},
 }
 
 ---Store the configuration and apply it right away.
@@ -242,6 +250,88 @@ local function swallow_leading(bufnr, srow, scol, erow)
   return srow, i
 end
 
+---The hidden line range that contains `row` (0-based), if any.
+---@param ranges table[]
+---@param row integer
+---@return table?
+local function block_at(ranges, row)
+  for _, range in ipairs(ranges) do
+    if row >= range[1] and row <= range[2] then
+      return range
+    end
+  end
+  return nil
+end
+
+---Nearest row that is not hidden, searching from `row` in direction `dir`
+---(+1 down, -1 up), then in the opposite direction as a fallback.
+---@param ranges table[]
+---@param row integer
+---@param dir integer
+---@param last_line integer
+---@return integer?
+local function visible_row(ranges, row, dir, last_line)
+  for _, delta in ipairs({ dir, -dir }) do
+    local i = row
+    while i >= 0 and i <= last_line do
+      if not block_at(ranges, i) then
+        return i
+      end
+      i = i + delta
+    end
+  end
+  return nil
+end
+
+-- Re-entrancy guard: moving the cursor below fires CursorMoved again.
+local snapping = false
+
+---Move the cursor off hidden lines.
+---
+---Hidden lines are not drawn (conceal_lines), but they still exist in the
+---buffer, so Neovim would let the cursor stop on every one of them. Whenever
+---the cursor lands on such a line we push it to the nearest visible line in the
+---direction of travel, which makes j/k behave like moving over a fold.
+---@param bufnr integer?
+local function snap_cursor(bufnr)
+  if snapping or not state.enabled then
+    return
+  end
+  bufnr = resolve(bufnr)
+
+  -- Never move the cursor while the user is typing.
+  local mode = vim.api.nvim_get_mode().mode
+  if mode:sub(1, 1) == "i" or mode:sub(1, 1) == "R" then
+    return
+  end
+
+  local ranges = state.hidden[bufnr]
+  local win = vim.api.nvim_get_current_win()
+  if not ranges or #ranges == 0 or vim.api.nvim_win_get_buf(win) ~= bufnr then
+    return
+  end
+
+  local row = vim.api.nvim_win_get_cursor(win)[1] - 1
+  if not block_at(ranges, row) then
+    state.last_row[bufnr] = row
+    return
+  end
+
+  -- Figure out whether we arrived here moving up or down.
+  local last = state.last_row[bufnr]
+  local dir = (last ~= nil and row < last) and -1 or 1
+  local last_line = vim.api.nvim_buf_line_count(bufnr) - 1
+  local target = visible_row(ranges, row, dir, last_line)
+  if target == nil or target == row then
+    return
+  end
+
+  snapping = true
+  pcall(vim.api.nvim_win_set_cursor, win, { target + 1, 0 })
+  state.last_row[bufnr] = target
+  snapping = false
+end
+
 ---Ask Treesitter which ranges should be hidden.
 ---
 ---Returns a list of `{ srow, scol, erow, ecol, kind }` entries where `kind` is
@@ -334,13 +424,17 @@ local function set_conceal(bufnr)
   -- Not a file we handle: forget it and stop.
   if not buffer_lang(bufnr) then
     state.buffers[bufnr] = nil
+    state.hidden[bufnr] = nil
     return
   end
 
-  -- Translate each range into a conceal extmark.
+  -- Translate each range into a conceal extmark; remember the hidden lines so
+  -- snap_cursor() can move the cursor off them.
+  local hidden = {}
   for _, mark in ipairs(collect_marks(bufnr)) do
     local srow, scol, erow, ecol, kind = mark[1], mark[2], mark[3], mark[4], mark[5]
     if kind == "lines" then
+      hidden[#hidden + 1] = { srow, erow }
       -- conceal_lines hides whole lines; end_row/end_col mark the covered range.
       vim.api.nvim_buf_set_extmark(bufnr, ns, srow, 0, {
         end_row = erow,
@@ -357,9 +451,12 @@ local function set_conceal(bufnr)
     end
   end
 
+  state.hidden[bufnr] = hidden
   state.buffers[bufnr] = true
   -- Extmarks alone do nothing visible; 'conceallevel' must be set to draw them.
   apply_window_options(bufnr)
+  -- The cursor may now sit on a freshly hidden line.
+  snap_cursor(bufnr)
 end
 
 ---Hide the types in every matching buffer and keep them hidden.
@@ -387,6 +484,16 @@ function M.enable()
     callback = function(args)
       if state.enabled then
         set_conceal(args.buf)
+      end
+    end,
+  })
+
+  -- Keep the cursor off hidden lines so j/k skip folded declarations.
+  vim.api.nvim_create_autocmd("CursorMoved", {
+    group = refresh_group,
+    callback = function(args)
+      if state.enabled then
+        snap_cursor(args.buf)
       end
     end,
   })
@@ -422,6 +529,8 @@ function M.disable()
     end
   end
   state.buffers = {}
+  state.hidden = {}
+  state.last_row = {}
 
   return true
 end

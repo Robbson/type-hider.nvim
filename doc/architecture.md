@@ -19,7 +19,7 @@ just removing the extmarks.
 | --- | --- |
 | `plugin/type-hider.lua` | Defines the user commands (`:TypeHiderEnable`, ...). Sourced automatically by Neovim. |
 | `lua/type-hider/init.lua` | Default configuration, `setup()`, public API (`enable`/`disable`/`toggle`), and the `.tsx` → `tsx` parser mapping. |
-| `lua/type-hider/main.lua` | The engine: autocommands, the Treesitter query run, range computation and the conceal extmarks. |
+| `lua/type-hider/main.lua` | The engine: autocommands, the Treesitter query run, range computation, the conceal extmarks, and the cursor snapping that skips hidden lines. |
 | `queries/typescript/type-hider.scm` | The Treesitter query that selects TypeScript-only syntax. |
 | `queries/tsx/type-hider.scm` | Same rules for `.tsx`; it just `inherits: typescript`. |
 
@@ -122,6 +122,27 @@ stateDiagram-v2
   buffer we touched, and resets `'conceallevel'` to 0. Clearing the extmarks is
   what actually reveals the text again.
 * `toggle()` is simply one or the other.
+
+## Cursor behaviour
+
+A hidden line is only hidden *visually*: it still exists in the buffer, so by
+default the cursor would stop on every one of them when you press `j`/`k`, and
+a folded 20-line declaration would take 20 key presses to get past. To avoid
+that, `enable()` also registers a `CursorMoved` autocommand. Whenever the cursor
+lands on a hidden line it is pushed to the nearest visible line in the direction
+of travel, so moving over a folded declaration feels like moving over a fold.
+
+```mermaid
+flowchart LR
+    move["j / k / G / mouse / search"] --> cm["CursorMoved"]
+    cm --> hidden{"cursor on a hidden line?"}
+    hidden -- no --> remember["remember the row"]
+    hidden -- yes --> snap["snap to nearest visible line<br/>(up or down, matching the direction of travel)"]
+```
+
+The hidden line ranges and the last visible row are cached per buffer by
+`set_conceal()`, so the check stays cheap. Snapping is skipped in insert mode
+while you are typing.
 
 ## A few Neovim concepts used here
 
