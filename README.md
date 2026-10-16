@@ -1,6 +1,5 @@
 # type-hider
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Robbson/type-hider.nvim/lint-test.yml?branch=main&style=for-the-badge)
 ![Lua](https://img.shields.io/badge/Made%20with%20Lua-blueviolet.svg?style=for-the-badge&logo=lua)
 
 _type-hider_ is a Neovim plugin that hides all type declarations in a TypeScript source file (.ts/.tsx) so the resulting code looks like plain JavaScript without losing any type-safety benefits. Because as the name suggests, types are only hidden from the user, not removed, so they are still working as expected.
