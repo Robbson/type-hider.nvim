@@ -45,6 +45,33 @@ local function count_with(buf, field)
   return n
 end
 
+---Text hidden by inline conceal marks.
+---@param buf integer
+---@return string[]
+local function concealed_texts(buf)
+  local texts = {}
+  for _, m in ipairs(extmarks(buf)) do
+    if m[4].conceal ~= nil then
+      local line = vim.api.nvim_buf_get_lines(buf, m[2], m[2] + 1, false)[1]
+      texts[#texts + 1] = line:sub(m[3] + 1, m[4].end_col)
+    end
+  end
+  return texts
+end
+
+---True when a folded range covers `row`.
+---@param buf integer
+---@param row integer
+---@return boolean
+local function folded_at(buf, row)
+  for _, m in ipairs(extmarks(buf)) do
+    if m[4].conceal_lines ~= nil and m[2] <= row and m[4].end_row >= row then
+      return true
+    end
+  end
+  return false
+end
+
 describe("type-hider", function()
   before_each(function()
     plugin.setup(defaults)
@@ -211,6 +238,80 @@ describe("type-hider", function()
 
       local buf = new_buffer({ "let x: number = 1;" }, "typescriptreact")
       assert.are.equal(1, count_with(buf, "conceal"))
+    end)
+  end)
+
+  describe("declaration coverage", function()
+    local inline_cases = {
+      { "class C implements I, J {}", "implements I, J" },
+      { "class C { public x = 1; }", "public " },
+      { "class C { private static x = 1; }", "private " },
+      { "class C { override m() {} }", "override " },
+      { "class C { readonly x = 1; }", "readonly " },
+      { "abstract class C {}", "abstract " },
+      { "function f(a?: number) {}", "?" },
+      { "let v!: string;", "!" },
+      { "const y = x!;", "!" },
+      { "function f(x: unknown): x is Foo {}", ": x is Foo" },
+      { "function f(x: unknown): asserts x is Foo {}", ": asserts x is Foo" },
+    }
+
+    for _, case in ipairs(inline_cases) do
+      it("conceals: " .. case[1], function()
+        if not has_parser("typescript") then
+          pending("typescript parser is not installed")
+          return
+        end
+
+        local buf = new_buffer({ case[1] }, "typescript")
+        local texts = concealed_texts(buf)
+        local found = false
+        for _, text in ipairs(texts) do
+          if text:find(case[2], 1, true) then
+            found = true
+          end
+        end
+        assert.is_true(found, case[1] .. " -> " .. vim.inspect(texts))
+      end)
+    end
+
+    local fold_cases = {
+      { "enum E { A, B }" },
+      { "const enum E { A, B }" },
+      { "declare const x: number;" },
+      { "declare function f(a: string): number;" },
+      { "function f(a: string): number;" },
+      { "import type { T } from './m';" },
+      { "export type { T } from './m';" },
+    }
+
+    for _, case in ipairs(fold_cases) do
+      it("folds: " .. case[1], function()
+        if not has_parser("typescript") then
+          pending("typescript parser is not installed")
+          return
+        end
+
+        local buf = new_buffer({ case[1] }, "typescript")
+        assert.is_true(folded_at(buf, case[2] or 0), case[1])
+      end)
+    end
+
+    it("conceals type-only import specifiers with their comma", function()
+      if not has_parser("typescript") then
+        pending("typescript parser is not installed")
+        return
+      end
+
+      local buf = new_buffer({ "import { type A, b } from './m';" }, "typescript")
+      local texts = concealed_texts(buf)
+      local found = false
+      for _, text in ipairs(texts) do
+        if text:find("type A,", 1, true) then
+          found = true
+        end
+      end
+      assert.is_true(found, vim.inspect(texts))
     end)
   end)
 end)

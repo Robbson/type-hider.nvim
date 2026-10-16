@@ -47,6 +47,43 @@ The rules live in a dedicated `type-hider` Treesitter query
 (`queries/typescript/type-hider.scm`), not in the `highlights` query, so the
 type hider never interferes with syntax highlighting.
 
+## What gets hidden
+
+Inline type syntax is concealed in place (with any surrounding whitespace):
+
+- type annotations `: T`
+- type parameters `function f<T>()` and type arguments `foo<T>()`
+- `implements A, B` clauses
+- `as` / `satisfies` casts
+- return type predicates `: x is T` and `: asserts x is T`
+- type-only modifiers and markers: `public` / `private` / `protected`,
+  `readonly`, `override`, `abstract` (on classes), optional `?`, definite `!`
+  and non-null `!`
+- type-only `import` / `export` specifiers (`import { type A, b }`)
+
+Whole declarations that emit no JavaScript are folded away, including one
+trailing blank line:
+
+- `interface` and `type` declarations
+- `enum` and `const enum`
+- `declare` / ambient declarations
+- function overload signatures
+- `abstract` methods and fields, index signatures
+- `import type ...` and `export type ...` statements
+
+Kept visible (they emit runtime JavaScript or are not type-only):
+
+- classes and their value members, functions with bodies, expressions
+- `namespace` blocks (they compile to runtime IIFEs)
+- decorators
+- constructor parameter properties keep working, but their implicit field
+  assignment is not shown
+- `export =` / `import ... = require(...)`
+
+The last points are deliberate; the query is a normal `.scm` file, so it can be
+extended or trimmed to taste.
+
+
 ## Features and structure
 
 - 100% Lua

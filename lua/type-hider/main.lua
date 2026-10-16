@@ -65,7 +65,8 @@ local function apply_window_options(bufnr)
   end
 end
 
----True when a node's first/last line contain nothing but the node itself.
+---True when a node's first/last line contain nothing but the node itself
+---(a trailing `;` on the last line is tolerated).
 ---@param bufnr integer
 ---@param srow integer
 ---@param scol integer
@@ -78,10 +79,29 @@ local function covers_whole_line(bufnr, srow, scol, erow, ecol)
     return false
   end
   local last = vim.api.nvim_buf_get_lines(bufnr, erow, erow + 1, false)[1] or ""
-  if last:sub(ecol + 1):find("%S") then
+  if not last:sub(ecol + 1):match("^[;%s]*$") then
     return false
   end
   return true
+end
+
+---Conceal range for a type-only import/export specifier, including a following
+---comma so `import { type A, b }` becomes `import { b }`.
+---@param node TSNode
+---@return table
+local function specifier_mark(node)
+  local srow, scol = node:range()
+  local erow, ecol = select(3, node:range())
+
+  local next_sibling = nil
+  if node.next_sibling then
+    next_sibling = node.next_sibling(node)
+  end
+  if next_sibling and next_sibling:type() == "," then
+    erow, ecol = select(3, next_sibling:range())
+  end
+
+  return { srow, scol, erow, ecol, "inline" }
 end
 
 ---Conceal range for an `as` / `satisfies` cast, starting at the keyword (and
@@ -112,6 +132,39 @@ local function cast_mark(node)
     prev = child
   end
   return nil
+end
+
+---Extend a range forward over trailing whitespace on its last line.
+---@param bufnr integer
+---@param erow integer
+---@param ecol integer
+---@return integer ecol
+local function swallow_trailing(bufnr, erow, ecol)
+  local line = vim.api.nvim_buf_get_lines(bufnr, erow, erow + 1, false)[1] or ""
+  local i = ecol + 1
+  while i <= #line and line:sub(i, i):match("%s") do
+    i = i + 1
+  end
+  return i - 1
+end
+
+---Extend a single-line range backward over leading whitespace.
+---@param bufnr integer
+---@param srow integer
+---@param scol integer
+---@param erow integer
+---@return integer srow
+---@return integer scol
+local function swallow_leading(bufnr, srow, scol, erow)
+  if srow ~= erow or scol == 0 then
+    return srow, scol
+  end
+  local line = vim.api.nvim_buf_get_lines(bufnr, srow, srow + 1, false)[1] or ""
+  local i = scol
+  while i >= 1 and line:sub(i, i):match("%s") do
+    i = i - 1
+  end
+  return srow, i
 end
 
 ---Ranges to conceal, as `{ srow, scol, erow, ecol, kind }`.
@@ -158,6 +211,14 @@ local function collect_marks(bufnr)
         if mark then
           marks[#marks + 1] = mark
         end
+      elseif capture == "type.specifier" then
+        marks[#marks + 1] = specifier_mark(node)
+      elseif capture == "type.modifier" then
+        -- Also hide the whitespace after the modifier to avoid double spaces.
+        marks[#marks + 1] = { srow, scol, erow, swallow_trailing(bufnr, erow, ecol), "inline" }
+      elseif capture == "type.clause" then
+        local lrow, lcol = swallow_leading(bufnr, srow, scol, erow)
+        marks[#marks + 1] = { lrow, lcol, erow, ecol, "inline" }
       elseif capture == "type" and not (srow == erow and scol == ecol) then
         marks[#marks + 1] = { srow, scol, erow, ecol, "inline" }
       end
