@@ -1,1 +1,1 @@
-vendor/plenary.nvim
+# Plenary is cloned to /tmp or $PLENARY_DIR by tests/minimal_init.lua.
