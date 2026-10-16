@@ -155,6 +155,33 @@ describe("type-hider", function()
       assert.are.equal(1, count_with(buf, "conceal"))
     end)
 
+    it("conceals as / satisfies casts", function()
+      if not has_parser("typescript") then
+        pending("typescript parser is not installed")
+        return
+      end
+
+      local cases = {
+        { "let a = x as Foo;", " as Foo" },
+        { "let b = x as const;", " as const" },
+        { "let c = x as Foo<Bar>;", " as Foo<Bar>" },
+        { "let d = x satisfies Foo;", " satisfies Foo" },
+        { "let e = x as readonly string[];", " as readonly string[]" },
+      }
+
+      for _, case in ipairs(cases) do
+        local buf = new_buffer({ case[1] }, "typescript")
+        local texts = {}
+        for _, m in ipairs(extmarks(buf)) do
+          if m[4].conceal ~= nil then
+            local line = vim.api.nvim_buf_get_lines(buf, m[2], m[2] + 1, false)[1]
+            texts[#texts + 1] = line:sub(m[3] + 1, m[4].end_col)
+          end
+        end
+        assert.is_true(vim.tbl_contains(texts, case[2]), case[1] .. " -> " .. vim.inspect(texts))
+      end
+    end)
+
     it("conceals types in tsx as well", function()
       if not has_parser("tsx") then
         pending("tsx parser is not installed")

@@ -84,6 +84,36 @@ local function covers_whole_line(bufnr, srow, scol, erow, ecol)
   return true
 end
 
+---Conceal range for an `as` / `satisfies` cast, starting at the keyword (and
+---swallowing the whitespace before it on the same line). The cast type may be
+---an anonymous node (`as const`), so it is not captured in the query; instead
+---the range is computed from the keyword to the node end.
+---@param node TSNode
+---@return table?
+local function cast_mark(node)
+  ---@type TSNode?
+  local prev = nil
+  for child in node:iter_children() do
+    local kind = child:type()
+    if kind == "as" or kind == "satisfies" then
+      local srow, scol = child:range()
+      local _, _, erow, ecol = node:range()
+      if prev then
+        local _, _, prow, pcol = prev:range()
+        if prow == srow then
+          scol = pcol
+        end
+      end
+      if srow == erow and scol == ecol then
+        return nil
+      end
+      return { srow, scol, erow, ecol, "inline" }
+    end
+    prev = child
+  end
+  return nil
+end
+
 ---Ranges to conceal, as `{ srow, scol, erow, ecol, kind }`.
 ---@param bufnr integer
 ---@return table[]
@@ -115,6 +145,11 @@ local function collect_marks(bufnr)
           marks[#marks + 1] = { srow, 0, erow, 0, "lines" }
         else
           marks[#marks + 1] = { srow, scol, erow, ecol, "inline" }
+        end
+      elseif capture == "type.cast" then
+        local mark = cast_mark(node)
+        if mark then
+          marks[#marks + 1] = mark
         end
       elseif capture == "type" and not (srow == erow and scol == ecol) then
         marks[#marks + 1] = { srow, scol, erow, ecol, "inline" }
